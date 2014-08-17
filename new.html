@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+  shape-rendering: crispEdges;
+}
+
+.minute {
+  fill: #fff;
+  stroke: #ccc;
+}
+
+.hour {
+  fill: none;
+  stroke: #000;
+  stroke-width: 2px;
+}
+
+.RdYlGn .q0-11{fill:rgb(165,0,38)}
+.RdYlGn .q1-11{fill:rgb(215,48,39)}
+.RdYlGn .q2-11{fill:rgb(244,109,67)}
+.RdYlGn .q3-11{fill:rgb(253,174,97)}
+.RdYlGn .q4-11{fill:rgb(254,224,139)}
+.RdYlGn .q5-11{fill:rgb(255,255,191)}
+.RdYlGn .q6-11{fill:rgb(217,239,139)}
+.RdYlGn .q7-11{fill:rgb(166,217,106)}
+.RdYlGn .q8-11{fill:rgb(102,189,99)}
+.RdYlGn .q9-11{fill:rgb(26,152,80)}
+.RdYlGn .q10-11{fill:rgb(0,104,55)}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+
+var rooms = ["A会議室","B会議室","C会議室","D会議室","E会議室","F会議室","G会議室"];
+var targetyear = 2014;
+var targetmounth = 8;
+var targetday = 7;
+var targetDate = new Date(targetyear, targetmounth, targetday);
+//console.log(targetDate);
+
+var meetingRoomTimeTable = (function(){
+    var timetable = [];
+    var maxdate;
+
+    function setMaxDate(dtObj) {
+        maxdate = d3.time.day.offset(dtObj, +1);
+    }
+
+    function setTimetable(time) {
+        timetable.push(time);
+    }
+
+    return {
+        setTimes : function(dateObj, ival) {
+            var dt = dateObj;
+            setMaxDate(dateObj);
+            setTimetable(dateObj);
+            while(dt < maxdate) {
+                dt = d3.time.minute.offset(dt, +ival);
+                if(dt < maxdate) {
+                    setTimetable(dt);
+                }
+            }
+        },
+        getTimes : function () {
+            return timetable;
+        }
+    };
+})();
+
+meetingRoomTimeTable.setTimes(new Date(targetyear, targetmounth, targetday), 5 );
+
+var width = 1100,
+    height = 300,
+    cellSize = 20; // cell size
+
+var day = d3.time.format("%w"),
+    week = d3.time.format("%U"),
+    percent = d3.format(".1%"),
+//    format = d3.time.format("%Y-%m-%d"),
+    format = d3.time.format("%m-%d %H:%M"),
+    hour = d3.time.format("%H"),
+    minute = d3.time.format("%M");
+
+var color = d3.scale.quantize()
+    .domain([-.05, .05])
+    .range(d3.range(11).map(function(d) { return "q" + d + "-11"; }));
+
+    //console.log(d3.range(1990, 2011));
+
+var svg = d3.select("body").selectAll("svg")
+//    .data(d3.range(1990, 2011))
+    .data(rooms)
+  .enter().append("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("class", "RdYlGn")
+  .append("g")
+    .attr("transform", "translate(60," + (height - cellSize * 12 - 1) + ")");
+
+svg.append("text")
+    .attr("transform", "translate(-6," + cellSize * 3.5 + ")rotate(-90)")
+    .style("text-anchor", "middle")
+    .text(function(d) { return d; });
+
+var timehead = svg.selectAll(".thead")
+    .data(
+            d3.time.hours(new Date(targetyear, targetmounth, targetday), new Date(targetyear, targetmounth, targetday + 1))
+    )
+    .enter()
+    .append("text")
+    .attr("class", "thead")
+    .text(function(d) {
+        return d;
+     }).datum(format);
+
+var rect = svg.selectAll(".minute")
+    .data(
+        //console.log(d3.time.days(new Date(d, 0, 1), new Date(d + 1, 0, 1)));
+        //return d3.time.days(new Date(d, 0, 1), new Date(d + 1, 0, 1));
+        meetingRoomTimeTable.getTimes()
+    )
+  .enter().append("rect")
+    .attr("class", "minute")
+    .attr("width", cellSize * 2)
+    .attr("height", cellSize)
+    .attr("x", function(d) {return hour(d) * cellSize * 2;})
+    .attr("y", function(d) {return (minute(d)/5) * cellSize;})
+    .datum(format);
+
+rect.append("title")
+    .text(function(d) { return d; });
+
+/*
+svg.selectAll(".hour")
+    .data(function(d) {
+        //console.log(d3.time.months(new Date(d, 0, 1), new Date(d + 1, 0, 1)));
+        return d3.time.months(new Date(d, 0, 1), new Date(d + 1, 0, 1));
+       })
+  .enter().append("path")
+    .attr("class", "hour")
+    .attr("d", monthPath);
+*/
+
+d3.csv("dji.csv", function(error, csv) {
+  var data = d3.nest()
+    .key(function(d) { return d.Date; })
+    .rollup(function(d) { return (d[0].Close - d[0].Open) / d[0].Open; })
+    .map(csv);
+
+  rect.filter(function(d) { return d in data; })
+      .attr("class", function(d) { return "day " + color(data[d]); })
+    .select("title")
+      .text(function(d) { return d + ": " + percent(data[d]); });
+});
+
+/*
+function monthPath(t0) {
+  var t1 = new Date(t0.getFullYear(), t0.getMonth() + 1, 0),
+      d0 = +day(t0), w0 = +week(t0),
+      d1 = +day(t1), w1 = +week(t1);
+  return "M" + (w0 + 1) * cellSize + "," + d0 * cellSize
+      + "H" + w0 * cellSize + "V" + 7 * cellSize
+      + "H" + w1 * cellSize + "V" + (d1 + 1) * cellSize
+      + "H" + (w1 + 1) * cellSize + "V" + 0
+      + "H" + (w0 + 1) * cellSize + "Z";
+}*/
+
+//d3.select(self.frameElement).style("height", "2910px");
+
+</script>
