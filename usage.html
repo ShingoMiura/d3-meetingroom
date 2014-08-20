@@ -84,14 +84,22 @@ svg.selectAll(".month")
 
 d3.csv("dji.csv", function(error, csv) {
   var data = d3.nest()
-    .key(function(d) { return d.Date; })
-    .rollup(function(d) { return (d[0].Close - d[0].Open) / d[0].Open; })
+    .key(function(d) {
+        return d.Date;
+       })
+    .rollup(function(d) {
+        return (d[0].Close - d[0].Open) / d[0].Open;
+    })
     .map(csv);
 
   rect.filter(function(d) { return d in data; })
-      .attr("class", function(d) { return "day " + color(data[d]); })
+      .attr("class", function(d) {
+          return "day " + color(data[d]);
+          })
     .select("title")
-      .text(function(d) { return d + ": " + percent(data[d]); });
+      .text(function(d) {
+          return d + ": " + percent(data[d]);
+      });
 });
 
 function monthPath(t0) {
